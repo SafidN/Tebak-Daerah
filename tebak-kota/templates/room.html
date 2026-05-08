@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room {{ room_code }} - Guess the City</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            color: white;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+        .player-card {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s;
+        }
+        .player-card.host {
+            border: 1px solid #fbbf24;
+            background: rgba(251, 191, 36, 0.1);
+        }
+        .game-canvas-container {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+            background: #0f172a;
+            border-radius: 15px;
+            overflow: hidden;
+            border: 3px solid rgba(255,255,255,0.2);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .game-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            font-weight: bold;
+            text-align: center;
+            flex-direction: column;
+            background-size: cover;
+            background-position: center;
+        }
+        .countdown-text {
+            font-size: 8rem;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .btn-start {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+        .btn-start:hover {
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+            transform: translateY(-2px);
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+<div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+    <!-- Left Column: Game Area -->
+    <div class="md:col-span-2 space-y-6">
+        
+        <!-- Header Info -->
+        <div class="glass-panel p-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-yellow-400">Kode Room: <span class="tracking-widest">{{ room_code }}</span></h1>
+                <p class="text-sm opacity-80" id="room-settings">Maks Player: - | Poin Menang: -</p>
+            </div>
+            <button id="btn-leave" class="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-sm font-bold transition">Keluar</button>
+        </div>
+
+        <!-- The Canvas -->
+        <div class="game-canvas-container">
+            <div id="game-canvas" class="game-canvas">
+                <div id="canvas-content">Menunggu..</div>
+            </div>
+        </div>
+
+        <!-- Host Controls (Only visible to host before game starts) -->
+        <div id="host-controls" class="glass-panel p-4 text-center hidden">
+            <p class="mb-3 text-sm">Kamu adalah Room Master. Klik tombol di bawah untuk memulai jika pemain sudah siap.</p>
+            <button id="btn-start-game" class="btn-start px-8 py-3 rounded-lg text-lg font-bold w-full md:w-auto transition">Mulai Game</button>
+        </div>
+
+        <!-- Game Inputs (Hidden initially) -->
+        <div id="game-controls" class="hidden mt-4">
+            <div class="glass-panel p-4 flex gap-3">
+                <input type="text" id="answer-input" class="flex-1 px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-400" placeholder="Tebak nama kota..." disabled>
+                <button id="btn-submit" class="bg-blue-500 hover:bg-blue-600 px-6 py-3 rounded-lg font-bold transition disabled:opacity-50" disabled>Kirim</button>
+            </div>
+            
+            <!-- Typing Indicator -->
+            <div id="typing-indicator" class="text-xs text-yellow-300 italic h-4 mt-2 hidden">Seseorang sedang mengetik...</div>
+            
+            <!-- Chat Box -->
+            <div id="chat-container" class="mt-2 glass-panel p-3 h-40 overflow-y-auto hidden">
+                <div id="chat-messages" class="space-y-2 text-sm text-left"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Player List & Leaderboard -->
+    <div class="glass-panel p-6 h-fit max-h-[80vh] overflow-y-auto">
+        <h2 class="text-xl font-bold mb-4 border-b border-white/20 pb-2">Pemain (<span id="player-count">0</span>)</h2>
+        <div id="player-list" class="space-y-3">
+            <!-- Players injected here -->
+            <div class="text-center text-sm opacity-50 py-4">Memuat pemain...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Menggunakan efek suara default / placeholder -->
+<audio id="sound-countdown" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+<audio id="sound-start" src="https://actions.google.com/sounds/v1/alarms/bugle_tune.ogg"></audio>
+
+<script>
+    const BACKEND_URL = 'http://localhost:3000'; 
+    const socket = io(BACKEND_URL);
+    const roomCode = '{{ room_code }}';
+    
+    // Load user data
+    const savedUser = localStorage.getItem('tebak_kota_user');
+    if (!savedUser) {
+        window.location.href = '/';
+    }
+    const currentUser = JSON.parse(savedUser);
+
+    // DOM Elements
+    const playerListDiv = document.getElementById('player-list');
+    const playerCountSpan = document.getElementById('player-count');
+    const roomSettingsP = document.getElementById('room-settings');
+    const canvasContent = document.getElementById('canvas-content');
+    const hostControls = document.getElementById('host-controls');
+    const btnStartGame = document.getElementById('btn-start-game');
+    const gameControls = document.getElementById('game-controls');
+    const answerInput = document.getElementById('answer-input');
+    const btnSubmit = document.getElementById('btn-submit');
+    const chatMsgs = document.getElementById('chat-messages');
+    
+    // Join room
+    socket.emit('join_room', {
+        roomId: roomCode,
+        playerName: currentUser.nickname,
+        avatar: currentUser.avatar,
+        isHost: currentUser.isHost
+    });
+
+    socket.on('error', (data) => {
+        alert(data.message);
+        window.location.href = '/';
+    });
+
+    socket.on('room_update', (data) => {
+        roomSettingsP.textContent = `Maks Player: ${data.max_players} | Poin Menang: ${data.win_points}`;
+        playerCountSpan.textContent = `${data.players.length}/${data.max_players}`;
+        
+        playerListDiv.innerHTML = data.players.map(p => `
+            <div class="player-card ${p.is_host ? 'host' : ''}">
+                <div class="text-2xl mr-3">${p.avatar}</div>
+                <div class="flex-1">
+                    <div class="font-bold text-sm">${p.name} ${p.is_host ? '<span class="text-xs bg-yellow-500 text-black px-1 rounded ml-1 font-bold">HOST</span>' : ''}</div>
+                    <div class="text-xs opacity-80 text-yellow-300 font-bold">${p.score} pts</div>
+                </div>
+            </div>
+        `).join('');
+
+        if (currentUser.isHost && data.status === 'waiting') {
+            hostControls.classList.remove('hidden');
+        } else {
+            hostControls.classList.add('hidden');
+        }
+    });
+
+    btnStartGame.addEventListener('click', () => {
+        socket.emit('start_game', roomCode);
+    });
+
+    document.getElementById('btn-leave').addEventListener('click', () => {
+        window.location.href = '/';
+    });
+
+    socket.on('new_question', (data) => {
+        hostControls.classList.add('hidden');
+        if (chatMsgs) chatMsgs.innerHTML = '';
+        
+        let count = 3;
+        const beepSound = document.getElementById('sound-countdown');
+        const startSound = document.getElementById('sound-start');
+        
+        canvasContent.innerHTML = `<div class="countdown-text text-yellow-400">${count}</div>`;
+        beepSound.play().catch(e=>console.log("Audio play prevented"));
+
+        const interval = setInterval(() => {
+            count--;
+            if (count > 0) {
+                canvasContent.innerHTML = `<div class="countdown-text text-yellow-400">${count}</div>`;
+                beepSound.currentTime = 0;
+                beepSound.play().catch(e=>console.log(e));
+            } else if (count === 0) {
+                canvasContent.innerHTML = `<div class="countdown-text text-green-400">MULAI!</div>`;
+                startSound.play().catch(e=>console.log(e));
+            } else {
+                clearInterval(interval);
+                
+                const imageUrl = BACKEND_URL + data.question.foto_url;
+                
+                canvasContent.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="text-2xl text-white/80 font-bold">Soal ${data.questionNumber} / 10</div>
+                        <div id="timer-display" class="text-sm font-bold bg-red-500/80 px-4 py-1.5 rounded-full text-white shadow-lg">Sisa waktu: ${data.timer} s</div>
+                    </div>
+                    <img src="${imageUrl}" alt="Soal Kota" class="w-full h-72 md:h-96 object-cover rounded-xl border-4 border-white/20 shadow-lg mx-auto">
+                `;
+                
+                document.getElementById('game-controls').classList.remove('hidden');
+                document.getElementById('chat-container').classList.remove('hidden');
+                answerInput.disabled = false;
+                btnSubmit.disabled = false;
+                answerInput.focus();
+                
+                window.gameTimer = data.timer;
+                if (window.gameTimerInterval) clearInterval(window.gameTimerInterval);
+                window.gameTimerInterval = setInterval(() => {
+                    window.gameTimer--;
+                    const timerDisp = document.getElementById('timer-display');
+                    if(timerDisp && window.gameTimer >= 0) timerDisp.textContent = `Sisa waktu: ${window.gameTimer} s`;
+                    
+                    if (window.gameTimer <= 0) {
+                        clearInterval(window.gameTimerInterval);
+                        if(timerDisp) timerDisp.textContent = `Waktu Habis!`;
+                        answerInput.disabled = true;
+                        btnSubmit.disabled = true;
+                    }
+                }, 1000);
+            }
+        }, 1000);
+    });
+
+    // 1. Handle Fitur Mengetik (Realtime)
+    let typingTimeout;
+    answerInput.addEventListener('input', () => {
+        socket.emit('typing', { roomId: roomCode, isTyping: true });
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+            socket.emit('typing', { roomId: roomCode, isTyping: false });
+        }, 1000);
+    });
+
+    answerInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            btnSubmit.click();
+        }
+    });
+
+    let currentTypers = new Set();
+    socket.on('player_typing', (data) => {
+        const typingInd = document.getElementById('typing-indicator');
+        if(!typingInd) return;
+        
+        if (data.isTyping) {
+            currentTypers.add(data.playerName);
+        } else {
+            currentTypers.delete(data.playerName);
+        }
+
+        if (currentTypers.size > 0) {
+            typingInd.classList.remove('hidden');
+            const typers = Array.from(currentTypers).join(', ');
+            typingInd.textContent = `${typers} sedang mengetik...`;
+        } else {
+            typingInd.classList.add('hidden');
+        }
+    });
+
+    // 2. Handle Jawaban Salah (Sesuai event: chat_message)
+    socket.on('chat_message', (data) => {
+        if(!chatMsgs) return;
+        chatMsgs.innerHTML += `<div class="text-red-400 py-0.5">❌ Jawaban <b>${data.sender}</b> salah</div>`;
+        chatMsgs.parentElement.scrollTop = chatMsgs.parentElement.scrollHeight;
+    });
+
+    // 3. Handle Jawaban Benar (Sesuai event: system_message)
+    socket.on('system_message', (data) => {
+        if(!chatMsgs) return;
+        chatMsgs.innerHTML += `<div class="text-green-400 font-bold py-1 italic">✨ ${data.message}</div>`;
+        chatMsgs.parentElement.scrollTop = chatMsgs.parentElement.scrollHeight;
+    });
+
+    // 4. Handle Hint AI (Sesuai event: game_hint)
+    socket.on('game_hint', (data) => {
+        if(!chatMsgs) return;
+        chatMsgs.innerHTML += `
+        <div class="text-yellow-300 bg-yellow-900/40 p-3 rounded-lg my-2 border border-yellow-500/50 text-sm italic">
+            ${data.message}
+        </div>`;
+        chatMsgs.parentElement.scrollTop = chatMsgs.parentElement.scrollHeight;
+    });
+
+    btnSubmit.addEventListener('click', () => {
+        const answer = answerInput.value.trim();
+        if(answer) {
+            socket.emit('submit_answer', {
+                roomId: roomCode,
+                answer: answer
+            });
+            answerInput.value = '';
+            answerInput.focus();
+            socket.emit('typing', { roomId: roomCode, isTyping: false });
+        }
+    });
+
+    socket.on('timer_update', (data) => {
+        const timerDisp = document.getElementById('timer-display');
+        if(timerDisp && data.timer >= 0) {
+            timerDisp.textContent = `Sisa waktu: ${data.timer} s`;
+        }
+    });
+
+    socket.on('question_ended', (data) => {
+        if (window.gameTimerInterval) clearInterval(window.gameTimerInterval);
+        const timerDisp = document.getElementById('timer-display');
+        if(timerDisp) timerDisp.textContent = `Waktu Habis!`;
+        answerInput.disabled = true;
+        btnSubmit.disabled = true;
+        
+        canvasContent.innerHTML += `
+            <div class="absolute inset-0 bg-black/80 flex flex-col items-center justify-center rounded-xl z-10 p-4">
+                <div class="text-3xl font-bold text-yellow-400 mb-2">Waktu Habis!</div>
+                <div class="text-lg text-white mb-4">Jawaban benar: <span class="font-bold text-green-400">${data.correctAnswer}</span></div>
+            </div>
+        `;
+    });
+
+    socket.on('game_over', (data) => {
+        if (window.gameTimerInterval) clearInterval(window.gameTimerInterval);
+        document.getElementById('game-controls').classList.add('hidden');
+        const winner = data.players.sort((a, b) => b.score - a.score)[0];
+        canvasContent.innerHTML = `
+            <div class="text-center h-full flex flex-col items-center justify-center">
+                <div class="text-4xl mb-4">🏆</div>
+                <div class="text-3xl font-bold text-yellow-400 mb-2">Game Selesai!</div>
+                <div class="text-xl text-white mb-6">Pemenang: <span class="font-bold">${winner ? winner.name : '-'}</span></div>
+                <button onclick="window.location.href='/'" class="bg-blue-500 hover:bg-blue-600 px-6 py-2 rounded-lg font-bold">Lobby</button>
+            </div>
+        `;
+    });
+</script>
+</body>
+</html>
