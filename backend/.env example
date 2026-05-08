@@ -1,0 +1,9 @@
+# Konfigurasi Database (Sesuaikan dengan Laragon)
+# Format: mysql://USER:PASSWORD@HOST:PORT/DATABASE_NAME
+DATABASE_URL="mysql://root:@localhost:3306/tebak_gambar_db"
+
+# Konfigurasi Server
+PORT=3000
+
+# API Keys (Jika ada)
+# GOOGLE_GENERATIVE_AI_KEY=

@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Model untuk tabel questions
+model Question {
+  id          Int      @id @default(autoincrement())
+  city_name   String  
+  foto_url    String?  
+  difficulty  String   
+  ai_hint     String?  @db.Text
+  
+  @@map("questions")
+}
+
+// Model untuk tabel rooms (Jika kamu benar-benar simpan room di DB)
+model Room {
+  id          String   @id
+  is_private  Boolean  @default(false)
+  // Tambahkan kolom lain jika ada, misal: maxPlayers Int, dsb.
+
+  @@map("rooms")
+}
