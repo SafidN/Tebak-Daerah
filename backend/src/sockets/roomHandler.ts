@@ -31,11 +31,69 @@ const deleteRoomIfUnused = (roomId: string) => {
   }
 };
 
-const removePlayerFromRoom = (io: Server, roomId: string, socketId: string) => {
+const buildRoomUpdatePayload = (room: Room) => {
+  const players = Array.from(room.players.values());
+  const readyPlayersCount = players.filter((player) => !player.is_host && player.ready).length;
+  const nonHostPlayersCount = players.filter((player) => !player.is_host).length;
+  const rematchReadyCount = players.filter((player) => !player.is_host && player.ready).length;
+
+  return {
+    players,
+    status: room.status,
+    max_players: room.maxPlayers,
+    win_points: room.winPoints || 100,
+    ready_players_count: readyPlayersCount,
+    non_host_players_count: nonHostPlayersCount,
+    rematch_ready_count: rematchReadyCount,
+    can_start: room.status === 'waiting' && nonHostPlayersCount > 0 && readyPlayersCount === nonHostPlayersCount,
+    can_restart: room.status === 'finished' && rematchReadyCount >= 1
+  };
+};
+
+const resetPlayersForNewRound = (room: Room, resetScores = true) => {
+  room.players.forEach((player) => {
+    player.hasAnsweredCorrectly = false;
+    player.wrongAttempts = 0;
+    player.aiHintStage = 0;
+    player.ready = false;
+    if (resetScores) {
+      player.score = 0;
+    }
+  });
+};
+
+const startGameSession = async (io: Server, roomId: string, resetScores = true) => {
+  const room = rooms.get(roomId);
+  if (!room) return;
+
+  try {
+    const cities = await getCities(room.difficulty);
+    room.questions = cities.sort(() => 0.5 - Math.random()).slice(0, 10);
+    room.status = 'playing';
+    room.currentQuestionIndex = 0;
+
+    resetPlayersForNewRound(room, resetScores);
+    io.to(roomId).emit('room_update', {
+      ...buildRoomUpdatePayload(room)
+    });
+    startQuestion(io, roomId);
+  } catch (error) {
+    console.error('Gagal mengambil soal dari DB:', error);
+    throw error;
+  }
+};
+
+const removePlayerFromRoom = (
+  io: Server,
+  roomId: string,
+  socketId: string,
+  options?: { emitLeaveNotice?: boolean }
+) => {
   const room = rooms.get(roomId);
   if (!room) return;
 
   const isHostLeaving = room.hostId === socketId;
+  const leavingPlayer = room.players.get(socketId);
   if (!room.players.has(socketId) && !isHostLeaving) return;
 
   room.players.delete(socketId);
@@ -49,11 +107,14 @@ const removePlayerFromRoom = (io: Server, roomId: string, socketId: string) => {
     return;
   }
 
+  if (options?.emitLeaveNotice !== false && leavingPlayer?.name) {
+    io.to(roomId).emit('room_notice', {
+      message: `${leavingPlayer.name} keluar`
+    });
+  }
+
   io.to(roomId).emit('room_update', {
-    players: Array.from(room.players.values()),
-    status: room.status,
-    max_players: room.maxPlayers,
-    win_points: room.winPoints || 100
+    ...buildRoomUpdatePayload(room)
   });
 
   deleteRoomIfUnused(roomId);
@@ -116,6 +177,9 @@ export const startQuestion = (io: Server, roomId: string) => {
             startQuestion(io, roomId);
           } else {
             room.status = 'finished';
+            io.to(roomId).emit('room_update', {
+              ...buildRoomUpdatePayload(room)
+            });
             io.to(roomId).emit('game_over', {
               players: Array.from(room.players.values())
             });
@@ -174,7 +238,9 @@ export const handleRoomEvents = (io: Server, socket: Socket) => {
       });
 
       // Update leaderboard
-      io.to(data.roomId).emit('room_update', { players: Array.from(room.players.values()) });
+      io.to(data.roomId).emit('room_update', {
+        ...buildRoomUpdatePayload(room)
+      });
     } else {
       // --- LOGIC JAWABAN SALAH ---
       player.wrongAttempts++;
@@ -221,16 +287,21 @@ export const handleRoomEvents = (io: Server, socket: Socket) => {
       timer: data.difficulty === 'Easy' ? 60 : data.difficulty === 'Medium' ? 70 : 80,
       questions: [],
       hostName: data.hostName || 'Host',
-      winPoints: 100
+      winPoints: 100,
+      kickedUserIds: new Set<string>()
     };
 
     rooms.set(roomId, newRoom);
     socket.emit('room_created', { roomId, message: 'Room berhasil dibuat' });
   });
 
-  socket.on('join_room', (data: { roomId: string, playerName: string, avatar: string, isHost: boolean }) => {
+  socket.on('join_room', (data: { roomId: string, playerName: string, avatar: string, isHost: boolean, userId?: string, source?: 'code' | 'lobby' }) => {
     const room = rooms.get(data.roomId);
     if (!room) return socket.emit('error', { message: 'Room not found' });
+    if (!room.kickedUserIds) room.kickedUserIds = new Set<string>();
+    if (data.source === 'lobby' && data.userId && room.kickedUserIds.has(data.userId)) {
+      return socket.emit('error', { message: 'Kamu sudah dikeluarkan dari room ini.' });
+    }
     if (room.players.size >= room.maxPlayers && !data.isHost) return socket.emit('error', { message: 'Room is full' });
     if (room.status !== 'waiting' && !data.isHost) return socket.emit('error', { message: 'Game has started' });
 
@@ -240,33 +311,60 @@ export const handleRoomEvents = (io: Server, socket: Socket) => {
 
     room.players.set(socket.id, {
       id: socket.id,
+      userId: data.userId,
       name: data.playerName,
       score: 0,
       wrongAttempts: 0,
       hasAnsweredCorrectly: false,
       aiHintStage: 0,
       avatar: data.avatar,
-      is_host: data.isHost
+      is_host: data.isHost,
+      ready: data.isHost
     } as any);
 
     socket.data.roomId = data.roomId;
     socket.join(data.roomId);
 
+    io.to(data.roomId).emit('room_notice', {
+      message: `${data.playerName} bergabung`
+    });
+
     io.to(data.roomId).emit('room_update', {
-      players: Array.from(room.players.values()),
-      status: room.status,
-      max_players: room.maxPlayers,
-      win_points: room.winPoints || 100
+      ...buildRoomUpdatePayload(room)
+    });
+  });
+
+  socket.on('toggle_ready', (data: { roomId?: string, ready: boolean }) => {
+    const roomId = data.roomId || socket.data.roomId;
+    if (!roomId) return;
+
+    const room = rooms.get(roomId);
+    if (!room || (room.status !== 'waiting' && room.status !== 'finished')) return;
+
+    const player = room.players.get(socket.id);
+    if (!player || player.is_host) return;
+
+    player.ready = data.ready;
+
+    io.to(roomId).emit('room_update', {
+      ...buildRoomUpdatePayload(room)
     });
   });
 
   socket.on('kick_player', (data: { roomId: string, targetId: string }) => {
     const room = rooms.get(data.roomId);
     if (room && room.hostId === socket.id) {
-      removePlayerFromRoom(io, data.roomId, data.targetId);
+      const targetPlayer = room.players.get(data.targetId);
+      if (targetPlayer?.userId) {
+        room.kickedUserIds.add(targetPlayer.userId);
+      }
+
+      removePlayerFromRoom(io, data.roomId, data.targetId, { emitLeaveNotice: false });
       io.sockets.sockets.get(data.targetId)?.leave(data.roomId);
-      io.sockets.sockets.get(data.targetId)?.emit('kicked', { reason: 'Dikeluarkan oleh Host.' });
-      io.to(data.roomId).emit('room_update', { message: 'Pemain telah dikeluarkan.' });
+      if (targetPlayer?.name) {
+        io.to(data.roomId).emit('room_notice', { message: `${targetPlayer.name} Telah Dikeluarkan` });
+      }
+      io.sockets.sockets.get(data.targetId)?.emit('kicked', { reason: 'Kamu telah dikeluarkan dari room ini.' });
     }
   });
 
@@ -275,22 +373,67 @@ export const handleRoomEvents = (io: Server, socket: Socket) => {
     if (!roomId) return;
 
     socket.leave(roomId);
-    removePlayerFromRoom(io, roomId, socket.id);
+    removePlayerFromRoom(io, roomId, socket.id, { emitLeaveNotice: true });
   });
 
   socket.on('start_game', async (roomId: string) => {
     const room = rooms.get(roomId);
-    if (room && room.hostId === socket.id) {
+    if (!room || room.hostId !== socket.id) return;
+
+    if (room.status === 'waiting') {
+      const nonHostPlayers = Array.from(room.players.values()).filter((player) => !player.is_host);
+      const allReady = nonHostPlayers.length > 0 && nonHostPlayers.every((player) => player.ready);
+
+      if (!allReady) {
+        socket.emit('error', { message: 'Tunggu semua pemain siap dulu.' });
+        return;
+      }
+
       try {
-        const cities = await getCities(room.difficulty);
-        room.questions = cities.sort(() => 0.5 - Math.random()).slice(0, 10);
-
-        room.status = 'playing';
-        room.currentQuestionIndex = 0;
-
-        startQuestion(io, roomId);
+        await startGameSession(io, roomId, true);
       } catch (error) {
-        console.error('Gagal mengambil soal dari DB:', error);
+        socket.emit('error', { message: 'Gagal memulai game karena masalah Database.' });
+      }
+      return;
+    }
+
+    if (room.status === 'finished') {
+      const readyPlayers = Array.from(room.players.values()).filter((player) => !player.is_host && player.ready);
+
+      if (readyPlayers.length < 1) {
+        socket.emit('error', { message: 'Minimal 1 pemain siap untuk main lagi.' });
+        return;
+      }
+
+      const notReadyPlayers = Array.from(room.players.values()).filter((player) => !player.is_host && !player.ready);
+
+      notReadyPlayers.forEach((player) => {
+        const targetSocket = io.sockets.sockets.get(player.id);
+        if (targetSocket) {
+          targetSocket.emit('rematch_excluded', {
+            reason: 'Kamu tidak ikut main lagi.'
+          });
+          targetSocket.leave(roomId);
+        }
+        if (player.name) {
+          io.to(roomId).emit('room_notice', {
+            message: `${player.name} keluar`
+          });
+        }
+        room.players.delete(player.id);
+      });
+
+      io.to(roomId).emit('room_notice', {
+        message: 'Main ulang dimulai.'
+      });
+
+      io.to(roomId).emit('room_update', {
+        ...buildRoomUpdatePayload(room)
+      });
+
+      try {
+        await startGameSession(io, roomId, true);
+      } catch (error) {
         socket.emit('error', { message: 'Gagal memulai game karena masalah Database.' });
       }
     }
@@ -299,6 +442,6 @@ export const handleRoomEvents = (io: Server, socket: Socket) => {
   socket.on('disconnect', () => {
     const roomId = socket.data.roomId;
     if (!roomId) return;
-    removePlayerFromRoom(io, roomId, socket.id);
+    removePlayerFromRoom(io, roomId, socket.id, { emitLeaveNotice: true });
   });
 };

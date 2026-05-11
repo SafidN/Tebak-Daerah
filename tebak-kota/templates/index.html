@@ -17,10 +17,44 @@
             box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
         }
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             min-height: 100vh;
             color: white;
             font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+        body::before,
+        body::after {
+            content: '';
+            position: fixed;
+            inset: auto;
+            pointer-events: none;
+            z-index: 0;
+            border-radius: 9999px;
+            filter: blur(18px);
+            opacity: 0.55;
+            animation: drift 14s ease-in-out infinite alternate;
+        }
+        body::before {
+            width: 22rem;
+            height: 22rem;
+            top: -5rem;
+            right: -6rem;
+            background: radial-gradient(circle, rgba(251, 191, 36, 0.34) 0%, rgba(251, 191, 36, 0.08) 55%, rgba(251, 191, 36, 0) 75%);
+        }
+        body::after {
+            width: 18rem;
+            height: 18rem;
+            bottom: -5rem;
+            left: -4rem;
+            background: radial-gradient(circle, rgba(96, 165, 250, 0.3) 0%, rgba(96, 165, 250, 0.08) 55%, rgba(96, 165, 250, 0) 75%);
+            animation-delay: -6s;
+        }
+        .dashboard-shell {
+            position: relative;
+            z-index: 1;
+            animation: panelIn 700ms ease-out both;
         }
         .avatar-option {
             cursor: pointer;
@@ -73,34 +107,103 @@
                 height: 2.75rem;
                 font-size: 1.75rem;
             }
+            .edit-profile-btn {
+                padding: 0.4rem 0.7rem;
+                font-size: 0.68rem;
+            }
         }
         .btn-primary {
             background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
             color: #333;
             font-weight: bold;
-            transition: all 0.3s ease;
+            transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
+            position: relative;
+            overflow: hidden;
         }
         .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 15px rgba(253, 160, 133, 0.5);
+            filter: brightness(1.02);
         }
         .btn-secondary {
             background: rgba(255, 255, 255, 0.2);
             color: white;
-            transition: all 0.3s ease;
+            transition: transform 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
         }
         .btn-secondary:hover {
             background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+        }
+        .edit-profile-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.45rem 0.8rem;
+            border-radius: 9999px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #111827;
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.98), rgba(253, 160, 133, 0.96));
+            border: 1px solid rgba(255, 255, 255, 0.28);
+            box-shadow: 0 8px 18px rgba(253, 160, 133, 0.22);
+            transition: transform 0.22s ease, box-shadow 0.22s ease, filter 0.22s ease;
+        }
+        .edit-profile-btn:hover {
+            transform: translateY(-1px) scale(1.03);
+            box-shadow: 0 12px 24px rgba(253, 160, 133, 0.3);
+            filter: brightness(1.03);
+        }
+        .edit-profile-btn:active {
+            transform: translateY(0) scale(0.99);
         }
         /* Hide sections initially */
         .hidden-section { display: none; }
+        #step-profile,
+        #step-menu,
+        #step-create,
+        #step-join,
+        #step-list {
+            animation: sectionPop 280ms ease-out;
+        }
+        #avatar-container .avatar-option {
+            animation: avatarPop 420ms ease-out both;
+        }
+        #avatar-container .avatar-option:nth-child(1) { animation-delay: 20ms; }
+        #avatar-container .avatar-option:nth-child(2) { animation-delay: 60ms; }
+        #avatar-container .avatar-option:nth-child(3) { animation-delay: 100ms; }
+        #avatar-container .avatar-option:nth-child(4) { animation-delay: 140ms; }
+        #avatar-container .avatar-option:nth-child(5) { animation-delay: 180ms; }
+        h1 {
+            animation: titleGlow 4s ease-in-out infinite;
+        }
+        @keyframes drift {
+            0% { transform: translate3d(0, 0, 0) scale(1); }
+            100% { transform: translate3d(0, 18px, 0) scale(1.08); }
+        }
+        @keyframes panelIn {
+            from { opacity: 0; transform: translateY(18px) scale(0.985); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes sectionPop {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes avatarPop {
+            from { opacity: 0; transform: translateY(8px) scale(0.92); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes titleGlow {
+            0%, 100% { filter: drop-shadow(0 0 0 rgba(251, 191, 36, 0)); }
+            50% { filter: drop-shadow(0 0 12px rgba(251, 191, 36, 0.18)); }
+        }
     </style>
 </head>
 <body class="flex items-center justify-center p-4">
 
-<div class="glass-panel p-8 w-full max-w-md">
+<div class="glass-panel dashboard-shell p-8 w-full max-w-md">
     <div class="text-center mb-8">
-        <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-500 drop-shadow-md">Guess the City!</h1>
+        <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-500 drop-shadow-md">TeKo!!</h1>
         <p class="text-sm mt-2 text-gray-200">Game Edukasi Kota Indonesia</p>
     </div>
 
@@ -129,12 +232,12 @@
         <div class="flex items-center mb-6 bg-white/10 p-3 rounded-lg">
             <div id="display-avatar" class="text-3xl mr-3">🦊</div>
             <div id="display-nickname" class="font-bold text-lg">Player</div>
-            <button id="btn-edit-profile" class="ml-auto text-xs text-yellow-300 hover:text-yellow-400 underline">Ubah</button>
+            <button id="btn-edit-profile" class="ml-auto edit-profile-btn">✎ Ubah</button>
         </div>
         <div class="space-y-4">
             <button id="btn-show-create" class="btn-primary w-full py-3 rounded-lg text-lg">Buat Room (Host)</button>
             <button id="btn-show-join" class="btn-secondary w-full py-3 rounded-lg text-lg">Masukkan Kode Room</button>
-            <button id="btn-show-list" class="btn-secondary w-full py-3 rounded-lg text-lg">Lihat List Lobby</button>
+            <button id="btn-show-list" class="btn-secondary w-full py-3 rounded-lg text-lg">Room Yang Tersedia</button>
         </div>
     </div>
 
@@ -181,7 +284,7 @@
 
     <!-- Step 5: Lobby List -->
     <div id="step-list" class="hidden-section">
-        <h2 class="text-xl font-bold mb-4">List Lobby Tersedia</h2>
+        <h2 class="text-xl font-bold mb-4">Room Yang Tersedia</h2>
         <div id="lobby-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto pr-2">
             <!-- Lobbies will be injected here -->
         </div>
@@ -195,7 +298,8 @@
     let currentUser = {
         nickname: '',
         avatar: '🦊',
-        isHost: false
+        isHost: false,
+        userId: ''
     };
 
     const normalizeAvatar = (value) => {
@@ -207,6 +311,13 @@
             'ðŸ±': '🐱'
         };
         return legacyAvatarMap[value] || value || '🦊';
+    };
+
+    const ensureUserId = () => {
+        if (!currentUser.userId) {
+            currentUser.userId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : `user_${Math.random().toString(36).slice(2, 10)}`;
+        }
+        return currentUser.userId;
     };
 
     // DOM Elements
@@ -245,6 +356,9 @@
     function showSection(section) {
         [stepProfile, stepMenu, stepCreate, stepJoin, stepList].forEach(el => el.classList.add('hidden-section'));
         section.classList.remove('hidden-section');
+        section.style.animation = 'none';
+        section.offsetHeight;
+        section.style.animation = '';
 
         if (section === stepList) {
             startLobbyAutoRefresh();
@@ -260,6 +374,7 @@
             return;
         }
         currentUser.nickname = nick;
+        ensureUserId();
         document.getElementById('display-nickname').textContent = nick;
         document.getElementById('display-avatar').textContent = normalizeAvatar(currentUser.avatar);
         
@@ -287,6 +402,8 @@
             });
             currentUser.nickname = data.nickname;
             currentUser.avatar = normalizeAvatar(data.avatar);
+            currentUser.userId = data.userId || '';
+            ensureUserId();
             document.getElementById('display-nickname').textContent = data.nickname;
             document.getElementById('display-avatar').textContent = normalizeAvatar(data.avatar);
             showSection(stepMenu);
@@ -327,6 +444,7 @@
             const data = await res.json();
             if(data.success) {
                 currentUser.isHost = true;
+                ensureUserId();
                 localStorage.setItem('tebak_kota_user', JSON.stringify(currentUser));
                 window.location.href = `/room/${data.room_code}`;
             }
@@ -339,8 +457,9 @@
         const code = document.getElementById('room-code-input').value.trim().toUpperCase();
         if(!code) return alert('Masukkan kode room!');
         currentUser.isHost = false;
+        ensureUserId();
         localStorage.setItem('tebak_kota_user', JSON.stringify(currentUser));
-        window.location.href = `/room/${code}`;
+        window.location.href = `/room/${code}?source=code`;
     });
 
     async function fetchLobbies() {
@@ -370,8 +489,9 @@
     // Global function to be called from inline HTML
     window.joinLobby = function(code) {
         currentUser.isHost = false;
+        ensureUserId();
         localStorage.setItem('tebak_kota_user', JSON.stringify(currentUser));
-        window.location.href = `/room/${code}`;
+        window.location.href = `/room/${code}?source=lobby`;
     };
 
     window.addEventListener('beforeunload', stopLobbyAutoRefresh);

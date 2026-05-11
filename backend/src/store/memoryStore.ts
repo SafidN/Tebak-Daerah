@@ -1,11 +1,14 @@
 export interface Player {
   id: string;
+  userId?: string;
   name: string;
   score: number;
   wrongAttempts: number;
   hasAnsweredCorrectly: boolean;
   aiHintStage: number;
   avatar?: string;
+  ready?: boolean;
+  is_host?: boolean;
 }
 
 export interface Room {
@@ -24,6 +27,7 @@ export interface Room {
   questions: any[]; // Array untuk menyimpan data soal (nama_kota, foto_url)
   hostName?: string;
   winPoints?: number;
+  kickedUserIds: Set<string>;
 }
 
 // Global state untuk menyimpan room aktif

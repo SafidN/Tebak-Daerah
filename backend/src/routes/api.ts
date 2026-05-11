@@ -26,7 +26,8 @@ apiRoutes.post('/rooms', async (c) => {
     timer: body.difficulty === 'Easy' ? 60 : body.difficulty === 'Medium' ? 70 : 80,
     questions: [],
     hostName: body.nickname || 'Host',
-    winPoints: parseInt(body.win_points) || 100
+    winPoints: parseInt(body.win_points) || 100,
+    kickedUserIds: new Set<string>()
   };
 
   rooms.set(roomId, newRoom);
