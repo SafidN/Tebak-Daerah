@@ -4,6 +4,8 @@ export interface Player {
   score: number;
   wrongAttempts: number;
   hasAnsweredCorrectly: boolean;
+  aiHintStage: number;
+  avatar?: string;
 }
 
 export interface Room {
@@ -18,6 +20,7 @@ export interface Room {
   currentQuestionIndex: number; // Array index 0-9
   timer: number;
   timerInterval?: NodeJS.Timeout;
+  preStartTimeout?: NodeJS.Timeout;
   questions: any[]; // Array untuk menyimpan data soal (nama_kota, foto_url)
   hostName?: string;
   winPoints?: number;

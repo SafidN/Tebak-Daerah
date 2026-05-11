@@ -29,11 +29,50 @@
             padding: 10px;
             border-radius: 50%;
             border: 2px solid transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 3.25rem;
+            height: 3.25rem;
+            line-height: 1;
         }
         .avatar-option.selected {
             border-color: #fbbf24;
             background: rgba(255, 255, 255, 0.2);
             transform: scale(1.1);
+        }
+        #display-avatar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 3rem;
+            height: 3rem;
+            flex-shrink: 0;
+            line-height: 1;
+            font-size: 1.9rem;
+            border-radius: 9999px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        @media (max-width: 767px) {
+            #avatar-container {
+                display: grid;
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+                gap: 0.25rem;
+                justify-items: center;
+                align-items: center;
+            }
+            .avatar-option {
+                font-size: 2rem;
+                padding: 0.4rem;
+            }
+            .avatar-option.selected {
+                transform: scale(1.04);
+            }
+            #display-avatar {
+                width: 2.75rem;
+                height: 2.75rem;
+                font-size: 1.75rem;
+            }
         }
         .btn-primary {
             background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
@@ -92,7 +131,6 @@
             <div id="display-nickname" class="font-bold text-lg">Player</div>
             <button id="btn-edit-profile" class="ml-auto text-xs text-yellow-300 hover:text-yellow-400 underline">Ubah</button>
         </div>
-        
         <div class="space-y-4">
             <button id="btn-show-create" class="btn-primary w-full py-3 rounded-lg text-lg">Buat Room (Host)</button>
             <button id="btn-show-join" class="btn-secondary w-full py-3 rounded-lg text-lg">Masukkan Kode Room</button>
@@ -160,19 +198,46 @@
         isHost: false
     };
 
+    const normalizeAvatar = (value) => {
+        const legacyAvatarMap = {
+            'ðŸ¦Š': '🦊',
+            'ðŸ¼': '🐼',
+            'ðŸ¯': '🐯',
+            'ðŸ¸': '🐸',
+            'ðŸ±': '🐱'
+        };
+        return legacyAvatarMap[value] || value || '🦊';
+    };
+
     // DOM Elements
     const stepProfile = document.getElementById('step-profile');
     const stepMenu = document.getElementById('step-menu');
     const stepCreate = document.getElementById('step-create');
     const stepJoin = document.getElementById('step-join');
     const stepList = document.getElementById('step-list');
+    let lobbyRefreshInterval = null;
+
+    const startLobbyAutoRefresh = () => {
+        if (lobbyRefreshInterval) return;
+        lobbyRefreshInterval = setInterval(() => {
+            if (!stepList.classList.contains('hidden-section')) {
+                fetchLobbies();
+            }
+        }, 4000);
+    };
+
+    const stopLobbyAutoRefresh = () => {
+        if (!lobbyRefreshInterval) return;
+        clearInterval(lobbyRefreshInterval);
+        lobbyRefreshInterval = null;
+    };
 
     // Avatar selection
     document.querySelectorAll('.avatar-option').forEach(el => {
         el.addEventListener('click', () => {
-            document.querySelectorAll('.avatar-option').forEach(opt => opt.classList.remove('selected'));
-            el.classList.add('selected');
-            currentUser.avatar = el.getAttribute('data-avatar');
+        document.querySelectorAll('.avatar-option').forEach(opt => opt.classList.remove('selected'));
+        el.classList.add('selected');
+            currentUser.avatar = normalizeAvatar(el.getAttribute('data-avatar'));
         });
     });
 
@@ -180,6 +245,12 @@
     function showSection(section) {
         [stepProfile, stepMenu, stepCreate, stepJoin, stepList].forEach(el => el.classList.add('hidden-section'));
         section.classList.remove('hidden-section');
+
+        if (section === stepList) {
+            startLobbyAutoRefresh();
+        } else {
+            stopLobbyAutoRefresh();
+        }
     }
 
     document.getElementById('btn-next').addEventListener('click', () => {
@@ -190,7 +261,7 @@
         }
         currentUser.nickname = nick;
         document.getElementById('display-nickname').textContent = nick;
-        document.getElementById('display-avatar').textContent = currentUser.avatar;
+        document.getElementById('display-avatar').textContent = normalizeAvatar(currentUser.avatar);
         
         // Save to localStorage for convenience
         localStorage.setItem('tebak_kota_user', JSON.stringify(currentUser));
@@ -210,14 +281,14 @@
             document.getElementById('nickname').value = data.nickname;
             // auto select avatar
             document.querySelectorAll('.avatar-option').forEach(opt => {
-                if(opt.getAttribute('data-avatar') === data.avatar) {
+                if(normalizeAvatar(opt.getAttribute('data-avatar')) === normalizeAvatar(data.avatar)) {
                     opt.click();
                 }
             });
             currentUser.nickname = data.nickname;
-            currentUser.avatar = data.avatar;
+            currentUser.avatar = normalizeAvatar(data.avatar);
             document.getElementById('display-nickname').textContent = data.nickname;
-            document.getElementById('display-avatar').textContent = data.avatar;
+            document.getElementById('display-avatar').textContent = normalizeAvatar(data.avatar);
             showSection(stepMenu);
         }
     };
@@ -241,7 +312,6 @@
         const winPoints = document.getElementById('win-points').value;
         const difficulty = document.getElementById('room-difficulty').value;
         const isPrivate = document.getElementById('room-private').checked;
-        
         try {
             const res = await fetch('http://localhost:3000/api/rooms', {
                 method: 'POST',
@@ -279,12 +349,10 @@
         try {
             const res = await fetch('http://localhost:3000/api/rooms');
             const rooms = await res.json();
-            
             if(rooms.length === 0) {
                 listDiv.innerHTML = '<p class="text-center text-sm opacity-70">Belum ada room yang tersedia.</p>';
                 return;
             }
-            
             listDiv.innerHTML = rooms.map(r => `
                 <div class="bg-white/10 p-3 rounded-lg flex justify-between items-center hover:bg-white/20 transition cursor-pointer mb-2" onclick="joinLobby('${r.code}')">
                     <div>
@@ -305,6 +373,8 @@
         localStorage.setItem('tebak_kota_user', JSON.stringify(currentUser));
         window.location.href = `/room/${code}`;
     };
+
+    window.addEventListener('beforeunload', stopLobbyAutoRefresh);
 
 </script>
 </body>

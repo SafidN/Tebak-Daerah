@@ -1,16 +1,75 @@
 import { Server, Socket } from 'socket.io';
-import { rooms, Room, Player } from '../store/memoryStore';
+import { rooms, Room } from '../store/memoryStore';
 import { getCities } from '../config/db';
-import { getSmartHint } from '../services/aiService'; // 👈 IMPORT AI SERVICE DI SINI
+import { getHintForLevel } from '../services/aiService';
+
+const HINT_THRESHOLD_BY_DIFFICULTY: Record<Room['difficulty'], number> = {
+  Easy: 5,
+  Medium: 3,
+  Hard: 2
+};
+
+const clearRoomTimers = (room: Room) => {
+  if (room.timerInterval) {
+    clearInterval(room.timerInterval);
+    room.timerInterval = undefined;
+  }
+
+  if (room.preStartTimeout) {
+    clearTimeout(room.preStartTimeout);
+    room.preStartTimeout = undefined;
+  }
+};
+
+const deleteRoomIfUnused = (roomId: string) => {
+  const room = rooms.get(roomId);
+  if (!room) return;
+
+  if (room.players.size === 0) {
+    clearRoomTimers(room);
+    rooms.delete(roomId);
+  }
+};
+
+const removePlayerFromRoom = (io: Server, roomId: string, socketId: string) => {
+  const room = rooms.get(roomId);
+  if (!room) return;
+
+  const isHostLeaving = room.hostId === socketId;
+  if (!room.players.has(socketId) && !isHostLeaving) return;
+
+  room.players.delete(socketId);
+
+  if (isHostLeaving) {
+    clearRoomTimers(room);
+    io.to(roomId).emit('room_closed', {
+      message: 'Host keluar. Room ditutup otomatis.'
+    });
+    rooms.delete(roomId);
+    return;
+  }
+
+  io.to(roomId).emit('room_update', {
+    players: Array.from(room.players.values()),
+    status: room.status,
+    max_players: room.maxPlayers,
+    win_points: room.winPoints || 100
+  });
+
+  deleteRoomIfUnused(roomId);
+};
 
 export const startQuestion = (io: Server, roomId: string) => {
   const room = rooms.get(roomId);
   if (!room) return;
 
+  clearRoomTimers(room);
+
   // Reset status jawaban pemain untuk soal baru
   room.players.forEach(p => {
     p.hasAnsweredCorrectly = false;
     p.wrongAttempts = 0;
+    p.aiHintStage = 0;
   });
 
   // Reset timer sesuai difficulty (Easy: 60s, Medium: 70s, Hard: 80s)
@@ -31,43 +90,44 @@ export const startQuestion = (io: Server, roomId: string) => {
     timer: room.timer
   });
 
-  if (room.timerInterval) clearInterval(room.timerInterval);
+  room.preStartTimeout = setTimeout(() => {
+    room.timerInterval = setInterval(() => {
+      room.timer--;
 
-  room.timerInterval = setInterval(() => {
-    room.timer--;
-    
-    // 👈 BROADCAST TIMER UPDATE BIAR ANGKA DI PYTHON BISA MUNDUR
-    io.to(roomId).emit('timer_update', { timer: room.timer });
-    
-    // Cek apakah semua orang sudah menjawab dengan benar
-    const allAnswered = Array.from(room.players.values()).every(p => p.hasAnsweredCorrectly);
-    
-    if (room.timer <= 0 || allAnswered) {
-      clearInterval(room.timerInterval);
-      
-      // Kirim jawaban benar dan tunggu 5 detik
-      io.to(roomId).emit('question_ended', {
-        correctAnswer: currentQuestion.city_name
-      });
+      // BROADCAST TIMER UPDATE BIAR ANGKA DI UI BISA MUNDUR
+      io.to(roomId).emit('timer_update', { timer: room.timer });
 
-      // Lanjut ke soal berikutnya setelah 5 detik
-      setTimeout(() => {
-        room.currentQuestionIndex++;
-        if (room.currentQuestionIndex < room.questions.length && room.currentQuestionIndex < 10) {
-          startQuestion(io, roomId);
-        } else {
-          room.status = 'finished';
-          io.to(roomId).emit('game_over', {
-            players: Array.from(room.players.values())
-          });
-        }
-      }, 5000);
-    }
-  }, 1000);
+      // Cek apakah semua orang sudah menjawab dengan benar
+      const allAnswered = Array.from(room.players.values()).every(p => p.hasAnsweredCorrectly);
+
+      if (room.timer <= 0 || allAnswered) {
+        if (room.timerInterval) clearInterval(room.timerInterval);
+        room.timerInterval = undefined;
+
+        // Kirim jawaban benar dan tunggu 5 detik
+        io.to(roomId).emit('question_ended', {
+          correctAnswer: currentQuestion.city_name
+        });
+
+        // Lanjut ke soal berikutnya setelah 5 detik
+        setTimeout(() => {
+          room.currentQuestionIndex++;
+          if (room.currentQuestionIndex < room.questions.length && room.currentQuestionIndex < 10) {
+            startQuestion(io, roomId);
+          } else {
+            room.status = 'finished';
+            io.to(roomId).emit('game_over', {
+              players: Array.from(room.players.values())
+            });
+            deleteRoomIfUnused(roomId);
+          }
+        }, 5000);
+      }
+    }, 1000);
+  }, 3000);
 };
 
 export const handleRoomEvents = (io: Server, socket: Socket) => {
-  
   // ==========================================
   // FITUR BARU: REAL-TIME TYPING
   // ==========================================
@@ -75,11 +135,11 @@ export const handleRoomEvents = (io: Server, socket: Socket) => {
     const room = rooms.get(data.roomId);
     const player = room?.players.get(socket.id);
     if (player) {
-        // Kirim ke semua orang di room KECUALI si pengirim
-        socket.to(data.roomId).emit('player_typing', { 
-            playerName: player.name, 
-            isTyping: data.isTyping 
-        });
+      // Kirim ke semua orang di room KECUALI si pengirim
+      socket.to(data.roomId).emit('player_typing', {
+        playerName: player.name,
+        isTyping: data.isTyping
+      });
     }
   });
 
@@ -98,41 +158,47 @@ export const handleRoomEvents = (io: Server, socket: Socket) => {
     const userAnswer = data.answer.toLowerCase().trim();
 
     if (userAnswer === correctAnswer) {
-        // --- LOGIC JAWABAN BENAR ---
-        // Hitung ada berapa orang yang udah jawab benar sebelumnya
-        const correctCount = Array.from(room.players.values()).filter(p => p.hasAnsweredCorrectly).length;
-        
-        // Peringkat 1 = 10 poin, Peringkat 2 = 9 poin, dst (minimal 1 poin)
-        const scoreEarned = Math.max(1, 10 - correctCount); 
+      // --- LOGIC JAWABAN BENAR ---
+      // Hitung ada berapa orang yang udah jawab benar sebelumnya
+      const correctCount = Array.from(room.players.values()).filter(p => p.hasAnsweredCorrectly).length;
 
-        player.score += scoreEarned;
-        player.hasAnsweredCorrectly = true;
+      // Peringkat 1 = 10 poin, Peringkat 2 = 9 poin, dst (minimal 1 poin)
+      const scoreEarned = Math.max(1, 10 - correctCount);
 
-        // Kirim pesan "Hidden Chat", teks jawabannya nggak ditampilin
-        io.to(data.roomId).emit('system_message', {
-            message: `Jawaban ${player.name} benar! (+${scoreEarned} Poin)`
-        });
+      player.score += scoreEarned;
+      player.hasAnsweredCorrectly = true;
 
-        // Update leaderboard
-        io.to(data.roomId).emit('room_update', { players: Array.from(room.players.values()) });
+      // Kirim pesan "Hidden Chat", teks jawabannya nggak ditampilin
+      io.to(data.roomId).emit('system_message', {
+        message: `Jawaban ${player.name} benar! (+${scoreEarned} Poin)`
+      });
 
+      // Update leaderboard
+      io.to(data.roomId).emit('room_update', { players: Array.from(room.players.values()) });
     } else {
-        // --- LOGIC JAWABAN SALAH ---
-        player.wrongAttempts++;
-        
-        // Munculin jawaban salahnya di chat global biar diketawain yang lain wkwk
-        io.to(data.roomId).emit('chat_message', {
-            sender: player.name,
-            message: data.answer
-        });
+      // --- LOGIC JAWABAN SALAH ---
+      player.wrongAttempts++;
 
-        // TRIGGER AI HINT KALAU SALAH 5x
-        if (player.wrongAttempts === 5) {
-            const hint = await getSmartHint(currentQuestion.id, currentQuestion.city_name);
-            
-            // Kirim hint ke orang yang salah tersebut aja (atau bisa io.to kalau mau se-room tahu)
-            socket.emit('game_hint', { message: `💡 Hint AI: ${hint}` });
-        }
+      // Munculin jawaban salahnya di chat global biar diketawain yang lain wkwk
+      io.to(data.roomId).emit('chat_message', {
+        sender: player.name,
+        avatar: player.avatar,
+        message: data.answer
+      });
+
+      const hintThreshold = HINT_THRESHOLD_BY_DIFFICULTY[room.difficulty];
+      const nextHintStage = player.aiHintStage + 1;
+
+      if (nextHintStage <= 3 && player.wrongAttempts >= hintThreshold * nextHintStage) {
+        player.aiHintStage = nextHintStage;
+
+        const hint = await getHintForLevel(currentQuestion.id, currentQuestion.city_name, nextHintStage as 1 | 2 | 3);
+
+        socket.emit('game_hint', {
+          level: nextHintStage,
+          hint
+        });
+      }
     }
   });
 
@@ -141,7 +207,7 @@ export const handleRoomEvents = (io: Server, socket: Socket) => {
   // ==========================================
   socket.on('create_room', (data: { difficulty: 'Easy'|'Medium'|'Hard', maxPlayers: number, isPrivate: boolean, hostName: string }) => {
     const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
-    
+
     const newRoom: Room = {
       id: roomId,
       hostId: socket.id,
@@ -152,12 +218,12 @@ export const handleRoomEvents = (io: Server, socket: Socket) => {
       status: 'waiting',
       currentQuestion: 1,
       currentQuestionIndex: 0,
-      timer: data.difficulty === 'Easy' ? 60 : data.difficulty === 'Medium' ? 70 : 80, // 👈 FIX TIMER
+      timer: data.difficulty === 'Easy' ? 60 : data.difficulty === 'Medium' ? 70 : 80,
       questions: [],
       hostName: data.hostName || 'Host',
       winPoints: 100
     };
-    
+
     rooms.set(roomId, newRoom);
     socket.emit('room_created', { roomId, message: 'Room berhasil dibuat' });
   });
@@ -172,51 +238,67 @@ export const handleRoomEvents = (io: Server, socket: Socket) => {
       room.hostId = socket.id;
     }
 
-    room.players.set(socket.id, { 
-        id: socket.id, 
-        name: data.playerName, 
-        score: 0, 
-        wrongAttempts: 0, 
-        hasAnsweredCorrectly: false,
-        avatar: data.avatar,
-        is_host: data.isHost
+    room.players.set(socket.id, {
+      id: socket.id,
+      name: data.playerName,
+      score: 0,
+      wrongAttempts: 0,
+      hasAnsweredCorrectly: false,
+      aiHintStage: 0,
+      avatar: data.avatar,
+      is_host: data.isHost
     } as any);
 
+    socket.data.roomId = data.roomId;
     socket.join(data.roomId);
-    
-    io.to(data.roomId).emit('room_update', { 
-        players: Array.from(room.players.values()),
-        status: room.status,
-        max_players: room.maxPlayers,
-        win_points: room.winPoints || 100
+
+    io.to(data.roomId).emit('room_update', {
+      players: Array.from(room.players.values()),
+      status: room.status,
+      max_players: room.maxPlayers,
+      win_points: room.winPoints || 100
     });
   });
 
   socket.on('kick_player', (data: { roomId: string, targetId: string }) => {
     const room = rooms.get(data.roomId);
     if (room && room.hostId === socket.id) {
-      room.players.delete(data.targetId);
+      removePlayerFromRoom(io, data.roomId, data.targetId);
       io.sockets.sockets.get(data.targetId)?.leave(data.roomId);
       io.sockets.sockets.get(data.targetId)?.emit('kicked', { reason: 'Dikeluarkan oleh Host.' });
       io.to(data.roomId).emit('room_update', { message: 'Pemain telah dikeluarkan.' });
     }
   });
 
+  socket.on('leave_room', (data: { roomId?: string }) => {
+    const roomId = data.roomId || socket.data.roomId;
+    if (!roomId) return;
+
+    socket.leave(roomId);
+    removePlayerFromRoom(io, roomId, socket.id);
+  });
+
   socket.on('start_game', async (roomId: string) => {
-      const room = rooms.get(roomId);
-      if(room && room.hostId === socket.id) {
-          try {
-            const cities = await getCities(room.difficulty);
-            room.questions = cities.sort(() => 0.5 - Math.random()).slice(0, 10);
-            
-            room.status = 'playing';
-            room.currentQuestionIndex = 0;
-            
-            startQuestion(io, roomId);
-          } catch (error) {
-            console.error("Gagal mengambil soal dari DB:", error);
-            socket.emit('error', { message: 'Gagal memulai game karena masalah Database.' });
-          }
+    const room = rooms.get(roomId);
+    if (room && room.hostId === socket.id) {
+      try {
+        const cities = await getCities(room.difficulty);
+        room.questions = cities.sort(() => 0.5 - Math.random()).slice(0, 10);
+
+        room.status = 'playing';
+        room.currentQuestionIndex = 0;
+
+        startQuestion(io, roomId);
+      } catch (error) {
+        console.error('Gagal mengambil soal dari DB:', error);
+        socket.emit('error', { message: 'Gagal memulai game karena masalah Database.' });
       }
+    }
+  });
+
+  socket.on('disconnect', () => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    removePlayerFromRoom(io, roomId, socket.id);
   });
 };

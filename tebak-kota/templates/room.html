@@ -60,6 +60,48 @@
             background-size: cover;
             background-position: center;
         }
+        .question-shell {
+            width: 100%;
+        }
+        .question-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 0.9rem;
+            padding: 0 0.25rem;
+        }
+        .question-frame {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.9rem;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.28);
+            border: 4px solid rgba(255, 255, 255, 0.16);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.22);
+        }
+        .question-frame img {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            object-position: center;
+            display: block;
+            margin: auto;
+        }
+        .question-image {
+            width: 100%;
+            max-height: 65vh;
+            object-fit: contain;
+            background: rgba(0, 0, 0, 0.35);
+            border-radius: 0.75rem;
+        }
+        #timer-display {
+            white-space: nowrap;
+        }
         .countdown-text {
             font-size: 8rem;
             text-shadow: 0 4px 20px rgba(0,0,0,0.5);
@@ -79,21 +121,167 @@
             transform: translateY(-2px);
         }
         .hidden { display: none !important; }
+        .mobile-nav {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 60;
+            padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.15), rgba(15, 23, 42, 0.92));
+            backdrop-filter: blur(16px);
+            border-top: 1px solid rgba(255, 255, 255, 0.16);
+        }
+        .mobile-nav-btn {
+            flex: 1;
+            border-radius: 999px;
+            padding: 0.8rem 0.9rem;
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.88);
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+        }
+        .mobile-nav-btn.active {
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.95), rgba(249, 115, 22, 0.92));
+            color: #111827;
+            border-color: rgba(255, 255, 255, 0.35);
+            transform: translateY(-1px);
+        }
+        .mobile-sheet {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 70;
+            transform: translateY(110%);
+            transition: transform 0.28s ease;
+            padding: 0 1rem calc(5.5rem + env(safe-area-inset-bottom));
+            pointer-events: none;
+        }
+        .mobile-sheet.open {
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+        .mobile-sheet-card {
+            background: rgba(15, 23, 42, 0.96);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 1.25rem;
+            box-shadow: 0 -18px 40px rgba(0, 0, 0, 0.35);
+            overflow: hidden;
+            max-height: 62vh;
+        }
+        .mobile-sheet-handle {
+            width: 3rem;
+            height: 0.35rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.28);
+            margin: 0.85rem auto 0.7rem;
+        }
+        .mobile-sheet-body {
+            max-height: 52vh;
+            overflow-y: auto;
+        }
+        .panel-toggle-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.45rem 0.8rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        @media (max-width: 767px) {
+            body {
+                padding-bottom: 7.5rem;
+            }
+            .glass-panel {
+                border-radius: 1.15rem;
+            }
+            .game-canvas {
+                align-items: center;
+                justify-content: center;
+                padding: 0.85rem;
+                box-sizing: border-box;
+            }
+            .game-canvas.question-mode {
+                align-items: flex-start;
+                justify-content: flex-start;
+                overflow-y: auto;
+            }
+            .question-shell {
+                padding-top: 0.1rem;
+            }
+            .question-meta {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+                gap: 0.75rem;
+                margin-bottom: 0.85rem;
+                padding: 0;
+            }
+            .question-frame {
+                aspect-ratio: 16 / 9;
+            }
+            .question-frame img {
+                max-width: 100%;
+                max-height: 100%;
+            }
+            #timer-display {
+                font-size: 0.72rem;
+                padding-left: 0.85rem;
+                padding-right: 0.85rem;
+            }
+            .countdown-text {
+                font-size: 4.25rem;
+            }
+            #player-sidebar {
+                display: none;
+            }
+            #room-header {
+                flex-direction: column;
+                gap: 0.85rem;
+                align-items: flex-start;
+            }
+            #room-header-actions {
+                width: 100%;
+                display: flex;
+                gap: 0.75rem;
+                flex-wrap: wrap;
+            }
+            #btn-leave {
+                flex: 1;
+            }
+            #mobile-score-strip {
+                display: flex;
+            }
+        }
+        @media (min-width: 768px) {
+            .mobile-nav,
+            .mobile-sheet {
+                display: none !important;
+            }
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
 
-<div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+<div id="room-layout" class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
     <!-- Left Column: Game Area -->
     <div class="md:col-span-2 space-y-6">
         
         <!-- Header Info -->
-        <div class="glass-panel p-4 flex justify-between items-center">
+        <div id="room-header" class="glass-panel p-4 flex justify-between items-center">
             <div>
                 <h1 class="text-2xl font-bold text-yellow-400">Kode Room: <span class="tracking-widest">{{ room_code }}</span></h1>
                 <p class="text-sm opacity-80" id="room-settings">Maks Player: - | Poin Menang: -</p>
             </div>
-            <button id="btn-leave" class="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-sm font-bold transition">Keluar</button>
+            <div id="room-header-actions" class="flex items-center gap-3">
+                <button id="btn-leave" class="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-sm font-bold transition">Keluar</button>
+            </div>
         </div>
 
         <!-- The Canvas -->
@@ -111,6 +299,10 @@
 
         <!-- Game Inputs (Hidden initially) -->
         <div id="game-controls" class="hidden mt-4">
+            <div id="mobile-score-strip" class="hidden md:hidden mb-2 justify-between items-center gap-2">
+                <div class="panel-toggle-chip">Player <span id="player-count-mobile">0</span></div>
+                <div class="panel-toggle-chip">Poin <span id="mobile-score-label">0</span></div>
+            </div>
             <div class="glass-panel p-4 flex gap-3">
                 <input type="text" id="answer-input" class="flex-1 px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-400" placeholder="Tebak nama kota..." disabled>
                 <button id="btn-submit" class="bg-blue-500 hover:bg-blue-600 px-6 py-3 rounded-lg font-bold transition disabled:opacity-50" disabled>Kirim</button>
@@ -127,11 +319,32 @@
     </div>
 
     <!-- Right Column: Player List & Leaderboard -->
-    <div class="glass-panel p-6 h-fit max-h-[80vh] overflow-y-auto">
+    <div id="player-sidebar" class="glass-panel p-6 h-fit max-h-[80vh] overflow-y-auto">
         <h2 class="text-xl font-bold mb-4 border-b border-white/20 pb-2">Pemain (<span id="player-count">0</span>)</h2>
         <div id="player-list" class="space-y-3">
             <!-- Players injected here -->
             <div class="text-center text-sm opacity-50 py-4">Memuat pemain...</div>
+        </div>
+    </div>
+</div>
+
+<div id="mobile-nav" class="mobile-nav md:hidden">
+    <div class="flex gap-2">
+        <button id="mobile-tab-players" class="mobile-nav-btn">Leaderboard</button>
+    </div>
+</div>
+
+<div id="mobile-sheet" class="mobile-sheet md:hidden">
+    <div class="mobile-sheet-card">
+        <div class="mobile-sheet-handle"></div>
+        <div class="px-4 pb-4">
+            <div class="flex items-center justify-between mb-3">
+                <div class="font-bold text-lg" id="mobile-sheet-title">Leaderboard Pemain</div>
+                <button id="mobile-sheet-close" class="text-sm px-3 py-1 rounded-full bg-white/10 border border-white/10">Tutup</button>
+            </div>
+            <div id="mobile-sheet-body" class="mobile-sheet-body">
+                <div class="text-sm opacity-80">Klik tombol Leaderboard untuk melihat pemain yang sedang main.</div>
+            </div>
         </div>
     </div>
 </div>
@@ -151,18 +364,78 @@
         window.location.href = '/';
     }
     const currentUser = JSON.parse(savedUser);
+    const normalizeAvatar = (value) => {
+        const legacyAvatarMap = {
+            '🦊': '🦊',
+            '🐼': '🐼',
+            '🐯': '🐯',
+            '🐸': '🐸',
+            '🐱': '🐱'
+        };
+        return legacyAvatarMap[value] || value || '🦊';
+    };
+    currentUser.avatar = normalizeAvatar(currentUser.avatar);
 
     // DOM Elements
     const playerListDiv = document.getElementById('player-list');
     const playerCountSpan = document.getElementById('player-count');
     const roomSettingsP = document.getElementById('room-settings');
     const canvasContent = document.getElementById('canvas-content');
+    const gameCanvas = document.getElementById('game-canvas');
     const hostControls = document.getElementById('host-controls');
     const btnStartGame = document.getElementById('btn-start-game');
     const gameControls = document.getElementById('game-controls');
     const answerInput = document.getElementById('answer-input');
     const btnSubmit = document.getElementById('btn-submit');
     const chatMsgs = document.getElementById('chat-messages');
+    const mobileSheet = document.getElementById('mobile-sheet');
+    const mobileSheetTitle = document.getElementById('mobile-sheet-title');
+    const mobileSheetBody = document.getElementById('mobile-sheet-body');
+    const mobileTabPlayers = document.getElementById('mobile-tab-players');
+    const mobileSheetClose = document.getElementById('mobile-sheet-close');
+    const mobileScoreLabel = document.getElementById('mobile-score-label');
+    const playerCountMobile = document.getElementById('player-count-mobile');
+    let countdownInterval = null;
+    let mobileActiveTab = 'closed';
+    let latestPlayers = [];
+
+    const isMobile = () => window.matchMedia('(max-width: 767px)').matches;
+
+    const setCanvasMode = (mode) => {
+        if (!gameCanvas) return;
+        gameCanvas.classList.toggle('question-mode', mode === 'question');
+    };
+
+    const syncMobileCounters = () => {
+        if (playerCountMobile && playerCountSpan) {
+            playerCountMobile.textContent = playerCountSpan.textContent || '0';
+        }
+
+        if (mobileScoreLabel) {
+            const currentPlayer = latestPlayers.find((player) => player.name === currentUser.nickname);
+            mobileScoreLabel.textContent = currentPlayer ? String(currentPlayer.score ?? 0) : '0';
+        }
+    };
+
+    const renderMobileSheet = () => {
+        if (!mobileSheet || !mobileSheetBody || !mobileSheetTitle) return;
+        if (!isMobile()) return;
+
+        if (mobileActiveTab !== 'players') {
+            mobileSheet.classList.remove('open');
+            return;
+        }
+
+        mobileSheet.classList.add('open');
+        mobileSheetTitle.textContent = 'Leaderboard Pemain';
+        mobileSheetBody.innerHTML = playerListDiv ? (playerListDiv.innerHTML || '<div class="text-sm opacity-70">Belum ada pemain.</div>') : '';
+    };
+
+    const setMobileTab = (tab) => {
+        mobileActiveTab = tab === 'players' ? 'players' : 'closed';
+        if (mobileTabPlayers) mobileTabPlayers.classList.toggle('active', mobileActiveTab === 'players');
+        renderMobileSheet();
+    };
     
     // Join room
     socket.emit('join_room', {
@@ -177,9 +450,15 @@
         window.location.href = '/';
     });
 
+    socket.on('room_closed', (data) => {
+        alert(data.message || 'Room ditutup.');
+        window.location.href = '/';
+    });
+
     socket.on('room_update', (data) => {
         roomSettingsP.textContent = `Maks Player: ${data.max_players} | Poin Menang: ${data.win_points}`;
         playerCountSpan.textContent = `${data.players.length}/${data.max_players}`;
+        latestPlayers = data.players || [];
         
         playerListDiv.innerHTML = data.players.map(p => `
             <div class="player-card ${p.is_host ? 'host' : ''}">
@@ -196,19 +475,34 @@
         } else {
             hostControls.classList.add('hidden');
         }
+
+        syncMobileCounters();
+        if (mobileActiveTab === 'players') {
+            renderMobileSheet();
+        }
     });
 
     btnStartGame.addEventListener('click', () => {
         socket.emit('start_game', roomCode);
     });
 
-    document.getElementById('btn-leave').addEventListener('click', () => {
-        window.location.href = '/';
+    const leaveRoom = () => {
+        socket.emit('leave_room', { roomId: roomCode });
+        setTimeout(() => {
+            window.location.href = '/';
+        }, 120);
+    };
+
+    document.getElementById('btn-leave').addEventListener('click', leaveRoom);
+    window.addEventListener('beforeunload', () => {
+        socket.emit('leave_room', { roomId: roomCode });
     });
 
     socket.on('new_question', (data) => {
         hostControls.classList.add('hidden');
         if (chatMsgs) chatMsgs.innerHTML = '';
+        if (countdownInterval) clearInterval(countdownInterval);
+        setCanvasMode('center');
         
         let count = 3;
         const beepSound = document.getElementById('sound-countdown');
@@ -217,7 +511,7 @@
         canvasContent.innerHTML = `<div class="countdown-text text-yellow-400">${count}</div>`;
         beepSound.play().catch(e=>console.log("Audio play prevented"));
 
-        const interval = setInterval(() => {
+        countdownInterval = setInterval(() => {
             count--;
             if (count > 0) {
                 canvasContent.innerHTML = `<div class="countdown-text text-yellow-400">${count}</div>`;
@@ -227,7 +521,9 @@
                 canvasContent.innerHTML = `<div class="countdown-text text-green-400">MULAI!</div>`;
                 startSound.play().catch(e=>console.log(e));
             } else {
-                clearInterval(interval);
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+                setCanvasMode('question');
                 
                 const imageUrl = BACKEND_URL + data.question.foto_url;
                 
@@ -244,21 +540,7 @@
                 answerInput.disabled = false;
                 btnSubmit.disabled = false;
                 answerInput.focus();
-                
-                window.gameTimer = data.timer;
-                if (window.gameTimerInterval) clearInterval(window.gameTimerInterval);
-                window.gameTimerInterval = setInterval(() => {
-                    window.gameTimer--;
-                    const timerDisp = document.getElementById('timer-display');
-                    if(timerDisp && window.gameTimer >= 0) timerDisp.textContent = `Sisa waktu: ${window.gameTimer} s`;
-                    
-                    if (window.gameTimer <= 0) {
-                        clearInterval(window.gameTimerInterval);
-                        if(timerDisp) timerDisp.textContent = `Waktu Habis!`;
-                        answerInput.disabled = true;
-                        btnSubmit.disabled = true;
-                    }
-                }, 1000);
+                setMobileTab('closed');
             }
         }, 1000);
     });
@@ -302,23 +584,33 @@
     // 2. Handle Jawaban Salah (Sesuai event: chat_message)
     socket.on('chat_message', (data) => {
         if(!chatMsgs) return;
-        chatMsgs.innerHTML += `<div class="text-red-400 py-0.5">❌ Jawaban <b>${data.sender}</b> salah</div>`;
+        const senderAvatar = normalizeAvatar(data.avatar);
+        chatMsgs.innerHTML += `
+            <div class="flex items-start gap-2 text-red-400 py-1">
+                <div class="text-xl leading-none">${senderAvatar}</div>
+                <div class="flex-1">
+                    <div>Jawaban <b>${data.sender}</b> salah</div>
+                </div>
+            </div>`;
         chatMsgs.parentElement.scrollTop = chatMsgs.parentElement.scrollHeight;
     });
 
     // 3. Handle Jawaban Benar (Sesuai event: system_message)
     socket.on('system_message', (data) => {
         if(!chatMsgs) return;
-        chatMsgs.innerHTML += `<div class="text-green-400 font-bold py-1 italic">✨ ${data.message}</div>`;
+        chatMsgs.innerHTML += `<div class="text-green-400 font-bold py-1 italic">Ã¢Å“Â¨ ${data.message}</div>`;
         chatMsgs.parentElement.scrollTop = chatMsgs.parentElement.scrollHeight;
     });
 
     // 4. Handle Hint AI (Sesuai event: game_hint)
     socket.on('game_hint', (data) => {
         if(!chatMsgs) return;
+        const hintText = data.hint || data.message || '';
+        const hintLabel = data.level ? `Hint ${data.level}` : 'Hint AI';
         chatMsgs.innerHTML += `
         <div class="text-yellow-300 bg-yellow-900/40 p-3 rounded-lg my-2 border border-yellow-500/50 text-sm italic">
-            ${data.message}
+            <div class="font-bold text-yellow-200 mb-1">${hintLabel}</div>
+            <div>${hintText}</div>
         </div>`;
         chatMsgs.parentElement.scrollTop = chatMsgs.parentElement.scrollHeight;
     });
@@ -336,15 +628,27 @@
         }
     });
 
+    mobileTabPlayers.addEventListener('click', () => {
+        setMobileTab(mobileActiveTab === 'players' ? 'closed' : 'players');
+    });
+    mobileSheetClose.addEventListener('click', () => setMobileTab('closed'));
+
     socket.on('timer_update', (data) => {
         const timerDisp = document.getElementById('timer-display');
         if(timerDisp && data.timer >= 0) {
             timerDisp.textContent = `Sisa waktu: ${data.timer} s`;
+            if (data.timer <= 0) {
+                answerInput.disabled = true;
+                btnSubmit.disabled = true;
+            }
         }
     });
 
     socket.on('question_ended', (data) => {
-        if (window.gameTimerInterval) clearInterval(window.gameTimerInterval);
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+        }
         const timerDisp = document.getElementById('timer-display');
         if(timerDisp) timerDisp.textContent = `Waktu Habis!`;
         answerInput.disabled = true;
@@ -359,17 +663,52 @@
     });
 
     socket.on('game_over', (data) => {
-        if (window.gameTimerInterval) clearInterval(window.gameTimerInterval);
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+        }
+        setCanvasMode('center');
+        setMobileTab('closed');
         document.getElementById('game-controls').classList.add('hidden');
         const winner = data.players.sort((a, b) => b.score - a.score)[0];
         canvasContent.innerHTML = `
             <div class="text-center h-full flex flex-col items-center justify-center">
-                <div class="text-4xl mb-4">🏆</div>
+                <div class="text-4xl mb-4">ðŸ†</div>
                 <div class="text-3xl font-bold text-yellow-400 mb-2">Game Selesai!</div>
                 <div class="text-xl text-white mb-6">Pemenang: <span class="font-bold">${winner ? winner.name : '-'}</span></div>
                 <button onclick="window.location.href='/'" class="bg-blue-500 hover:bg-blue-600 px-6 py-2 rounded-lg font-bold">Lobby</button>
             </div>
         `;
+        if (window.matchMedia('(max-width: 767px)').matches) {
+            const gameOverCard = canvasContent.firstElementChild;
+            const trophyEl = gameOverCard?.firstElementChild;
+            const titleEl = trophyEl?.nextElementSibling;
+            const winnerEl = titleEl?.nextElementSibling;
+            const buttonEl = winnerEl?.nextElementSibling;
+            if (gameOverCard) {
+                gameOverCard.style.paddingTop = '0.75rem';
+                gameOverCard.style.paddingBottom = '0.75rem';
+            }
+            if (trophyEl) {
+                trophyEl.style.fontSize = '2.9rem';
+                trophyEl.style.lineHeight = '1';
+                trophyEl.style.marginBottom = '0.25rem';
+                trophyEl.style.display = 'block';
+            }
+            if (titleEl) {
+                titleEl.style.fontSize = '1.7rem';
+                titleEl.style.marginBottom = '0.35rem';
+                titleEl.style.lineHeight = '1.15';
+            }
+            if (winnerEl) {
+                winnerEl.style.fontSize = '1rem';
+                winnerEl.style.marginBottom = '1rem';
+            }
+            if (buttonEl) {
+                buttonEl.style.fontSize = '1rem';
+                buttonEl.style.padding = '0.45rem 1.15rem';
+            }
+        }
     });
 </script>
 </body>
