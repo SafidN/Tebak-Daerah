@@ -294,12 +294,15 @@
 </div>
 
 <script>
+    const STORAGE_KEY = 'tebak_kota_user';
+    const SERVER_BOOT_ID = '{{ server_boot_id }}';
     // State
     let currentUser = {
         nickname: '',
         avatar: '🦊',
         isHost: false,
-        userId: ''
+        userId: '',
+        serverBootId: SERVER_BOOT_ID
     };
 
     const normalizeAvatar = (value) => {
@@ -318,6 +321,23 @@
             currentUser.userId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : `user_${Math.random().toString(36).slice(2, 10)}`;
         }
         return currentUser.userId;
+    };
+
+    const loadSavedUser = () => {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) return null;
+
+        try {
+            const data = JSON.parse(saved);
+            if (!data || data.serverBootId !== SERVER_BOOT_ID) {
+                localStorage.removeItem(STORAGE_KEY);
+                return null;
+            }
+            return data;
+        } catch (error) {
+            localStorage.removeItem(STORAGE_KEY);
+            return null;
+        }
     };
 
     // DOM Elements
@@ -374,12 +394,13 @@
             return;
         }
         currentUser.nickname = nick;
+        currentUser.serverBootId = SERVER_BOOT_ID;
         ensureUserId();
         document.getElementById('display-nickname').textContent = nick;
         document.getElementById('display-avatar').textContent = normalizeAvatar(currentUser.avatar);
         
         // Save to localStorage for convenience
-        localStorage.setItem('tebak_kota_user', JSON.stringify(currentUser));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentUser));
         
         showSection(stepMenu);
     });
@@ -390,9 +411,8 @@
 
     // Check if returning user
     window.onload = () => {
-        const saved = localStorage.getItem('tebak_kota_user');
-        if (saved) {
-            const data = JSON.parse(saved);
+        const data = loadSavedUser();
+        if (data) {
             document.getElementById('nickname').value = data.nickname;
             // auto select avatar
             document.querySelectorAll('.avatar-option').forEach(opt => {
@@ -403,6 +423,7 @@
             currentUser.nickname = data.nickname;
             currentUser.avatar = normalizeAvatar(data.avatar);
             currentUser.userId = data.userId || '';
+            currentUser.serverBootId = SERVER_BOOT_ID;
             ensureUserId();
             document.getElementById('display-nickname').textContent = data.nickname;
             document.getElementById('display-avatar').textContent = normalizeAvatar(data.avatar);
@@ -444,8 +465,9 @@
             const data = await res.json();
             if(data.success) {
                 currentUser.isHost = true;
+                currentUser.serverBootId = SERVER_BOOT_ID;
                 ensureUserId();
-                localStorage.setItem('tebak_kota_user', JSON.stringify(currentUser));
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(currentUser));
                 window.location.href = `/room/${data.room_code}`;
             }
         } catch (e) {
@@ -457,8 +479,9 @@
         const code = document.getElementById('room-code-input').value.trim().toUpperCase();
         if(!code) return alert('Masukkan kode room!');
         currentUser.isHost = false;
+        currentUser.serverBootId = SERVER_BOOT_ID;
         ensureUserId();
-        localStorage.setItem('tebak_kota_user', JSON.stringify(currentUser));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentUser));
         window.location.href = `/room/${code}?source=code`;
     });
 
@@ -489,8 +512,9 @@
     // Global function to be called from inline HTML
     window.joinLobby = function(code) {
         currentUser.isHost = false;
+        currentUser.serverBootId = SERVER_BOOT_ID;
         ensureUserId();
-        localStorage.setItem('tebak_kota_user', JSON.stringify(currentUser));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentUser));
         window.location.href = `/room/${code}?source=lobby`;
     };
 

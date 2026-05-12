@@ -411,13 +411,31 @@
     const socket = io(BACKEND_URL);
     const roomCode = '{{ room_code }}';
     const joinSource = new URLSearchParams(window.location.search).get('source') === 'lobby' ? 'lobby' : 'code';
+    const STORAGE_KEY = 'tebak_kota_user';
+    const SERVER_BOOT_ID = '{{ server_boot_id }}';
     
     // Load user data
-    const savedUser = localStorage.getItem('tebak_kota_user');
+    const loadSavedUser = () => {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) return null;
+
+        try {
+            const data = JSON.parse(saved);
+            if (!data || data.serverBootId !== SERVER_BOOT_ID) {
+                localStorage.removeItem(STORAGE_KEY);
+                return null;
+            }
+            return data;
+        } catch (error) {
+            localStorage.removeItem(STORAGE_KEY);
+            return null;
+        }
+    };
+    const savedUser = loadSavedUser();
     if (!savedUser) {
         window.location.href = '/';
     }
-    const currentUser = JSON.parse(savedUser);
+    const currentUser = savedUser || {};
     const normalizeAvatar = (value) => {
         const legacyAvatarMap = {
             '🦊': '🦊',
@@ -431,7 +449,8 @@
     const ensureUserId = () => {
         if (!currentUser.userId) {
             currentUser.userId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : `user_${Math.random().toString(36).slice(2, 10)}`;
-            localStorage.setItem('tebak_kota_user', JSON.stringify(currentUser));
+            currentUser.serverBootId = SERVER_BOOT_ID;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(currentUser));
         }
         return currentUser.userId;
     };
@@ -572,7 +591,8 @@
         const currentPlayer = latestPlayers.find((player) => player.id === socket.id);
         currentPlayerReady = Boolean(currentPlayer?.ready);
         currentUser.isHost = Boolean(currentPlayer?.is_host);
-        localStorage.setItem('tebak_kota_user', JSON.stringify(currentUser));
+        currentUser.serverBootId = SERVER_BOOT_ID;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentUser));
         currentCanStart = Boolean(data.can_start);
         currentCanRestart = Boolean(data.can_restart);
         const readyPlayersCount = data.ready_players_count || 0;

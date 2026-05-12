@@ -7,6 +7,7 @@ import uuid
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'kunci_rahasia_tebak_kota'
 socketio = SocketIO(app)
+SERVER_BOOT_ID = str(uuid.uuid4())
 
 # In-memory storage sementara untuk prototype
 rooms = {}
@@ -16,7 +17,7 @@ def generate_room_code():
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', server_boot_id=SERVER_BOOT_ID)
 
 @app.route('/create_room', methods=['POST'])
 def create_room():
@@ -50,7 +51,7 @@ def get_rooms():
 def room(room_code):
     room_code = room_code.upper()
     # Pengecekan eksistensi Room kini dihandle oleh Node.js Socket
-    return render_template('room.html', room_code=room_code)
+    return render_template('room.html', room_code=room_code, server_boot_id=SERVER_BOOT_ID)
 
 @socketio.on('join')
 def on_join(data):
